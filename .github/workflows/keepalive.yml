@@ -1,0 +1,33 @@
+name: Keep scheduled weather active
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 1 * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weather-keepalive
+  cancel-in-progress: false
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - name: Record monthly repository activity
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          date -u '+%Y-%m-%dT%H:%M:%SZ' > .github/keepalive
+          git add .github/keepalive
+          git commit -m 'Keep scheduled weather updates active'
+          git push origin "HEAD:$DEFAULT_BRANCH"

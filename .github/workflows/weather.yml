@@ -1,0 +1,59 @@
+name: Update weather
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7,37 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - "generate.py"
+      - "weather_icons.py"
+      - "config.toml"
+      - "requirements.txt"
+      - "assets/**"
+      - "tests/**"
+      - ".github/workflows/weather.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: weather-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install renderer
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Verify data handling and image format
+        run: python -m unittest discover -s tests -v
+      - name: Generate current weather images
+        run: python generate.py --config config.toml --output public
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Upload complete site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: public
+          retention-days: 1
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

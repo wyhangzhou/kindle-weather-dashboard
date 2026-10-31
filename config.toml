@@ -1,0 +1,10 @@
+city = "Redmond"
+region = "华盛顿州 · 美国"
+latitude = 47.67399
+longitude = -122.12151
+timezone = "America/Los_Angeles"
+temperature_unit = "celsius"
+forecast_days = 5
+max_weather_age_minutes = 90
+# Native framebuffer PNG; physical orientation will be verified on the Kindle.
+kindle_rotation = "counterclockwise"

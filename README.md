@@ -1,0 +1,75 @@
+# Kindle 中文天气屏
+
+为 Kindle 4 生成清晰的中文灰度天气图。默认 Redmond, Washington、摄氏度、五天天气、美国太平洋时区。天气图由 GitHub Actions 更新并部署到 GitHub Pages，家中无需常开服务器。
+
+## 生成内容
+
+| 文件 | 用途 |
+| --- | --- |
+| `dashboard.png` | 800×600 横向天气图，适合浏览器预览 |
+| `dashboard-kindle.png` | 同一画面旋转为原生 600×800 像素排列，供 Kindle 实机方向测试 |
+| `manifest.json` | 数据时间、生成时间、图片尺寸及 SHA-256 |
+| `weather.json` | 已验证并转换为中文界面所需的数据 |
+| `index.html` | 自动刷新的浏览器预览页 |
+
+图片为无透明通道的 `L` 模式 PNG，最多 16 个灰度。当前天气包括温度、体感、天气状况、湿度、风速和当天降雨概率；下方显示未来五天的高低温和降雨概率。时间按 `America/Los_Angeles` 显示。
+
+## 本地运行
+
+需要 Python 3.11 或更新版本；本项目当前在 Python 3.14 上验证。
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python generate.py
+```
+
+输出在 `public/`，可直接打开 `public/dashboard.png` 查看。生成器只替换带有本项目输出标记的目录，拒绝覆盖其他已有文件夹。
+
+API 请求失败、数据超过 90 分钟、单位异常或预报不完整时，生成器返回失败，不生成替代天气。GitHub 工作流因此不执行发布，线上继续保留上一次成功的图片；屏幕上的数据日期可用于判断是否已陈旧。缺失的降雨概率显示 `—`。
+
+## GitHub Pages 部署
+
+1. 将本目录作为独立仓库上传到 GitHub，默认分支为 `main`。
+2. 在 Settings → Pages 中将 Source 设为 **GitHub Actions**。
+3. 在 Actions 中执行 **Update weather**。成功后使用该仓库的 Pages 地址。
+
+典型图片地址为：
+
+```text
+https://USERNAME.github.io/kindle-weather-dashboard/dashboard-kindle.png
+```
+
+上述地址是模板；实际发布成功后应核对真实地址及 Kindle 下载结果。
+
+默认在每小时第 7 和 37 分钟更新，约每 30 分钟一次。避开整点是为了降低排队概率；GitHub 的定时任务可能延迟或被丢弃，并非精确定时服务。公开仓库没有活动达到 60 天时，定时工作流可能停用，因此另有每月一次的小型保活提交。保活只更新 `.github/keepalive`，不把每张天气图提交到 Git 历史。
+
+如果保活失败或定时任务被停用，在 Actions 中重新启用工作流并手动执行一次，随后检查失败记录。平台的调度、仓库权限和可用性仍需实际长期验证。
+
+公开仓库可以使用 GitHub Free 的 Pages；当前工作流使用标准 Ubuntu 托管运行器，每次最长 5 分钟，Pages 构建产物保留 1 天。尚未发布时，不把本地成功生成当作云端自动运行已经验证。
+
+## 修改城市、单位和间隔
+
+修改 `config.toml` 中的 `city`、`region`、`latitude`、`longitude` 和 `timezone`。坐标可以通过 [Open-Meteo 地理编码接口](https://open-meteo.com/en/docs/geocoding-api) 查询；城市与时区应一起调整。
+
+- `temperature_unit`：`celsius` 或 `fahrenheit`；天气 API 内部始终取摄氏度，显示时转换。
+- `forecast_days`：3 至 5。
+- `kindle_rotation`：`counterclockwise` 或 `clockwise`，应以 Kindle 实际摆放和按键位置为准。
+- 云端刷新频率：修改 `.github/workflows/weather.yml` 的 cron。Kindle 端下载间隔需要在设备运行器完成后独立设置。
+
+当前天气时间使用真正的 UTC 时间戳转换本地时区。Open-Meteo 的每日数据采用响应中固定的 UTC 偏移定义日期，代码按该规则解码；跨夏令时测试覆盖 2026-11-01，避免预报日重复。
+
+## Kindle 端进度
+
+已经在 Kindle 4 Black / 固件 4.1.2 上验证 KUAL、USB SSH、原生阅读，以及带独立 CA 的 xh HTTPS 下载。原版 KUAL 的签名算法需要兼容处理，该设备已使用程序内容不变的兼容签名副本。
+
+本目录目前负责云端图片；设备的定时休眠、唤醒、物理退出和完整恢复阅读仍需逐项实测。尚未设置 Dashboard 开机自动运行。独立 CA 和下载工具放在用户目录，保留系统组件。实际续航不能由接口存在或电量百分比推算。
+
+## 数据和字体
+
+天气数据来自 [Open-Meteo](https://open-meteo.com/)，按 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 使用并在图片、预览页中署名。本项目为个人家庭信息屏，按其 [免费非商业 API 条款](https://open-meteo.com/en/terms) 使用。
+
+中文字体为 Google Noto Sans SC，原文件和校验信息在 `assets/fonts/`，许可证为同目录 `OFL.txt`。天气图标由本项目代码绘制。
+
+参考：[天气 API 参数](https://open-meteo.com/en/docs)、[Pages 工作流](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)、[定时工作流规则](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)。
