@@ -38,7 +38,17 @@ watch_keys() {
     parent=$2
     LOG=$3
     child=''
-    trap 'trap - 0 1 2 15; if [ -n "$child" ]; then kill "$child" 2>/dev/null || true; wait "$child" 2>/dev/null || true; fi; exit 0' 0 1 2 15
+    watch_cleanup() {
+        watch_rc=$?
+        trap - 0 1 2 15
+        if [ -n "$child" ]; then
+            kill "$child" 2>/dev/null || true
+            wait "$child" 2>/dev/null || true
+        fi
+        exit "$watch_rc"
+    }
+    trap watch_cleanup 0
+    trap 'exit 0' 1 2 15
     log "KEY_WATCH start parent=$parent"
     while kill -0 "$parent" 2>/dev/null; do
         /usr/bin/waitforkey > "$LOCK/key-event" &
@@ -46,6 +56,13 @@ watch_keys() {
         printf 'ready\n' > "$LOCK/key-ready"
         wait "$child"
         waiter_rc=$?
+        # Old ash returns 2 from an interrupted wait before running its trap.
+        # Keep the child PID until it is reaped; cleanup still needs to kill it.
+        [ ! -r "$LOCK/key-stop" ] || exit 0
+        if kill -0 "$child" 2>/dev/null; then
+            log "KEY_WATCH interrupted while input waiter is still running rc=$waiter_rc"
+            exit 1
+        fi
         child=''
         code=''; value=''
         read code value < "$LOCK/key-event"
@@ -85,6 +102,7 @@ cleanup() {
     rc=$?
     trap - 0 1 2 15
     if [ -n "$WATCH_PID" ]; then
+        printf 'stop\n' > "$LOCK/key-stop"
         kill "$WATCH_PID" 2>/dev/null || true
         wait "$WATCH_PID" 2>/dev/null || true
     fi
@@ -129,7 +147,7 @@ cleanup() {
         [ "$MODE" != --self-check ] || [ "$reason" = home ] || rc=1
     fi
     log "END result=$RESULT rc=$rc"
-    rm -f "$LOCK/pid" "$LOCK/key-event" "$LOCK/key-ready" "$LOCK/stop-reason"
+    rm -f "$LOCK/pid" "$LOCK/key-event" "$LOCK/key-ready" "$LOCK/key-stop" "$LOCK/stop-reason"
     rmdir "$LOCK" 2>/dev/null || true
     sync
     exit "$rc"

@@ -59,15 +59,25 @@ class WeatherPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "site"
             manifest = generate_site(self.fixture, self.config, output, self.now)
+            device = dict(line.split("=", 1) for line in (output / "device-manifest.txt").read_text().splitlines())
+            self.assertEqual(len(device), 12)
+            self.assertEqual(device["schema"], SCHEMA)
+            self.assertEqual(int(device["weather_epoch"]), self.fixture["current"]["time"])
+            self.assertEqual(int(device["generated_epoch"]), int(self.now.timestamp()))
+            self.assertEqual(int(device["expires_epoch"]), self.fixture["current"]["time"] + 90 * 60)
             for name, dimensions in (("dashboard.png", (800, 600)), ("dashboard-kindle.png", (600, 800))):
                 data = (output / name).read_bytes()
                 self.assertEqual(hashlib.sha256(data).hexdigest(), manifest["images"][name]["sha256"])
+                self.assertEqual(hashlib.md5(data, usedforsecurity=False).hexdigest(), manifest["images"][name]["md5"])
                 with Image.open(output / name) as image:
                     image.load()
                     self.assertEqual(image.size, dimensions)
                     self.assertEqual(image.mode, "L")
                     self.assertLessEqual(len(image.getcolors(256)), 16)
                     self.assertGreater(len(image.getcolors(256)), 1)
+            self.assertEqual(device["md5"], manifest["images"]["dashboard-kindle.png"]["md5"])
+            self.assertEqual(device["sha256"], manifest["images"]["dashboard-kindle.png"]["sha256"])
+            self.assertEqual(device["bytes"], str(manifest["images"]["dashboard-kindle.png"]["bytes"]))
             # A subsequent successful run can replace an owned output directory.
             generate_site(self.fixture, self.config, output, self.now + timedelta(minutes=1))
             self.assertTrue((output / "index.html").is_file())

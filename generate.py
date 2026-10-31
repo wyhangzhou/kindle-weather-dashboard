@@ -264,6 +264,9 @@ def generate_site(payload, config, output, now=None):
     manifest = {
         "schema": SCHEMA, "city": config.city, "timezone": config.timezone,
         "generated_at": weather.generated_at.isoformat(), "weather_at": weather.weather_at.isoformat(),
+        "generated_epoch": int(weather.generated_at.timestamp()),
+        "weather_epoch": int(weather.weather_at.timestamp()),
+        "expires_epoch": int(weather.weather_at.timestamp()) + config.max_weather_age_minutes * 60,
         "temperature_unit": config.temperature_unit, "kindle_rotation": config.kindle_rotation,
         "images": {},
     }
@@ -272,8 +275,16 @@ def generate_site(payload, config, output, now=None):
         for name, picture in images.items():
             data = png_bytes(picture)
             (stage / name).write_bytes(data)
-            manifest["images"][name] = {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data),
+            manifest["images"][name] = {"sha256": hashlib.sha256(data).hexdigest(),
+                                        "md5": hashlib.md5(data, usedforsecurity=False).hexdigest(), "bytes": len(data),
                                         "width": picture.width, "height": picture.height, "mode": picture.mode}
+        # Strict, non-executable ASCII metadata for the Kindle's old shell.
+        native = manifest["images"]["dashboard-kindle.png"]
+        device = {"schema": SCHEMA, **{key: manifest[key] for key in (
+            "generated_epoch", "weather_epoch", "expires_epoch")},
+            "file": "dashboard-kindle.png", **native, "rotation": config.kindle_rotation}
+        (stage / "device-manifest.txt").write_text(
+            "".join(f"{key}={value}\n" for key, value in device.items()), encoding="ascii")
         (stage / MARKER).write_text(SCHEMA + "\n")
         (stage / ".nojekyll").touch()
         (stage / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
