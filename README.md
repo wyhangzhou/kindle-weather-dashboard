@@ -43,7 +43,7 @@ Kindle 图片地址为：
 https://wyhangzhou.github.io/kindle-weather-dashboard/dashboard-kindle.png
 ```
 
-Mac 已核对线上两张 PNG 的尺寸、灰度格式及 SHA-256；当前 Kindle USB 连接未激活，实际设备下载该网址仍待接线恢复后验证。
+Mac 已核对线上两张 PNG 的尺寸、灰度格式及 SHA-256；Kindle 也已从本项目 Pages 实际下载 manifest 和原生排列 PNG，HTTPS 返回 200，文件 SHA-256 与线上清单完全一致。
 
 首次成功部署：[Update weather](https://github.com/wyhangzhou/kindle-weather-dashboard/actions/runs/41245412215)（第 2 次尝试；首次因 Pages 尚未启用而失败）。每月保活也已通过一次手动执行验证。
 
@@ -68,7 +68,7 @@ Mac 已核对线上两张 PNG 的尺寸、灰度格式及 SHA-256；当前 Kindl
 
 已经在 Kindle 4 Black / 固件 4.1.2 上验证 KUAL、USB SSH、原生阅读，以及带独立 CA 的 xh HTTPS 下载。原版 KUAL 的签名算法需要兼容处理，该设备已使用程序内容不变的兼容签名副本。
 
-本目录目前负责云端图片；设备的定时休眠、唤醒、物理退出和完整恢复阅读仍需逐项实测。尚未设置 Dashboard 开机自动运行。独立 CA 和下载工具放在用户目录，保留系统组件。实际续航不能由接口存在或电量百分比推算。
+云端图片与 Kindle 实际下载已验证。`kindle/preview/` 提供 KUAL 一次性预览入口，安装后选择 **Weather preview**，用于核对屏幕方向和中文显示，具体步骤见该目录 README。设备的定时休眠、唤醒、物理退出和完整恢复阅读仍需逐项实测。尚未设置 Dashboard 开机自动运行。独立 CA 和下载工具放在用户目录，保留系统组件。实际续航不能由接口存在或电量百分比推算。
 
 ## 数据和字体
 

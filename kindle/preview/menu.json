@@ -1,0 +1,9 @@
+{
+  "items": [
+    {
+      "name": "Weather preview",
+      "action": "./preview.sh",
+      "exitmenu": false
+    }
+  ]
+}
