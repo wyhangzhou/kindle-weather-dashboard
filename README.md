@@ -35,19 +35,23 @@ API 请求失败、数据超过 90 分钟、单位异常或预报不完整时，
 2. 在 Settings → Pages 中将 Source 设为 **GitHub Actions**。
 3. 在 Actions 中执行 **Update weather**。成功后使用该仓库的 Pages 地址。
 
-典型图片地址为：
+当前已发布的天气预览：[打开天气页](https://wyhangzhou.github.io/kindle-weather-dashboard/)。
+
+Kindle 图片地址为：
 
 ```text
-https://USERNAME.github.io/kindle-weather-dashboard/dashboard-kindle.png
+https://wyhangzhou.github.io/kindle-weather-dashboard/dashboard-kindle.png
 ```
 
-上述地址是模板；实际发布成功后应核对真实地址及 Kindle 下载结果。
+Mac 已核对线上两张 PNG 的尺寸、灰度格式及 SHA-256；当前 Kindle USB 连接未激活，实际设备下载该网址仍待接线恢复后验证。
+
+首次成功部署：[Update weather](https://github.com/wyhangzhou/kindle-weather-dashboard/actions/runs/41245412215)（第 2 次尝试；首次因 Pages 尚未启用而失败）。每月保活也已通过一次手动执行验证。
 
 默认在每小时第 7 和 37 分钟更新，约每 30 分钟一次。避开整点是为了降低排队概率；GitHub 的定时任务可能延迟或被丢弃，并非精确定时服务。公开仓库没有活动达到 60 天时，定时工作流可能停用，因此另有每月一次的小型保活提交。保活只更新 `.github/keepalive`，不把每张天气图提交到 Git 历史。
 
 如果保活失败或定时任务被停用，在 Actions 中重新启用工作流并手动执行一次，随后检查失败记录。平台的调度、仓库权限和可用性仍需实际长期验证。
 
-公开仓库可以使用 GitHub Free 的 Pages；当前工作流使用标准 Ubuntu 托管运行器，每次最长 5 分钟，Pages 构建产物保留 1 天。尚未发布时，不把本地成功生成当作云端自动运行已经验证。
+公开仓库可以使用 GitHub Free 的 Pages；当前工作流使用标准 Ubuntu 托管运行器，每次最长 5 分钟，Pages 构建产物保留 1 天。当前已验证一次云端天气构建及发布、一次保活执行；长期定时运行仍需观察。
 
 ## 修改城市、单位和间隔
 
