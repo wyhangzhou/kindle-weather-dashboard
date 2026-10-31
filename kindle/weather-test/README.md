@@ -15,3 +15,18 @@
 任何请求、格式或校验失败都不替换已保存的缓存。`--current` 可读取过期缓存供恢复显示，图片上的日期和更新时间仍表明其陈旧状态；新下载必须通过有效期检查。有限测试失败会记录原因并恢复 Home，持续断网重试尚未由此实现或验证。
 
 重新生成准备图：在仓库根目录运行 `.venv/bin/python kindle/weather-test/render_screens.py`。实际连续刷新、唤醒后实体 Home 退出和长期运行，仍需设备日志和用户观察确认。
+
+
+## 提前唤醒退出测试
+
+**Wake and exit test** 只显示缓存天气并安排一次 120 秒唤醒；它不重复刷新。准备画面出现后 15 秒内拔 USB，天气图显示后等约 5 秒，短按电源键唤醒，再按 Home。脚本应恢复原来的闹钟及 Wi-Fi/屏保设置并回到主页。未操作时约 2 分钟自动返回。此测试用于验证中途退出能取消尚未到期的唤醒，真实休眠后的这条路径尚待用户和日志验证。
+
+`exit-test.sh --check` 只读检查；`--self-check` 在不画图、不设置未来闹钟、不休眠的情况下验证 Home 取消及设置恢复。闹钟状态仅保存在 `/mnt/us/kindle-weather/state/alarm-exit-test`，成功恢复后删除；失败保留供检查，不直接覆盖其他来源的新闹钟。
+
+### K4 原生 RTC 恢复实现及限制
+
+`alarm.sh` 只支持本项目已核对的 K4/MC13892、MC34708 寄存器布局。读取 PMIC 的独立秒计数来判定报警时间；该计数不等于系统 UTC，不能把当前 Unix 时间直接写进去。标准 `rtc1/wakealarm` 的驱动不填 `enabled`，设置时也忽略它，因此不能把读空或写 0 当作硬件取消成功。恢复时核对闹钟所有权，然后禁用报警比较器，恢复保存的报警时间/日期与启用位，并逐项读回。系统时钟及 PMIC 时钟计数器保持不变。
+
+这个固件的 `/dev/pmic` 写 ioctl 忽略传入的位掩码。实现必须先读整寄存器、在用户态合并位值，再写回整值；写入范围严格限制为报警寄存器 21/23，禁止写中断掩码或其他电源寄存器。原型第一次掩码验证失败后已撤销其影响，正确实现的不休眠未来闹钟→原值恢复检查已通过，中断配置前后相同。原型故障和恢复证据保留在主工作区的私有研究记录；正式休眠后的提前退出仍需实际验证。
+
+固定版本参考：[PMIC 写 ioctl](https://github.com/fread-ink/kernel-k4-usb-otg/blob/bb242cbb9f42c1d32ccd886804f79f61803e9653/drivers/mxc/pmic/core/pmic-dev.c)、[MC13892 RTC](https://github.com/fread-ink/kernel-k4-usb-otg/blob/bb242cbb9f42c1d32ccd886804f79f61803e9653/drivers/rtc/rtc-mc13892.c)、[MC34708 RTC](https://github.com/fread-ink/kernel-k4-usb-otg/blob/bb242cbb9f42c1d32ccd886804f79f61803e9653/drivers/rtc/rtc-mc34708.c)。这些源码与本机读回检查共同约束实现，不据接口名称推断行为。
