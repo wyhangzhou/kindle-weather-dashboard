@@ -1,0 +1,10 @@
+{
+  "items": [{
+    "name": "Weather",
+    "items": [
+      {"name": "Start weather (30 min)", "action": "./start.sh", "exitmenu": false},
+      {"name": "Check one 30-min cycle", "action": "./start.sh", "params": "--trial", "exitmenu": false},
+      {"name": "Stop weather / Read", "action": "./stop.sh", "exitmenu": true}
+    ]
+  }]
+}

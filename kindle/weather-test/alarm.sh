@@ -84,7 +84,8 @@ case "$MODE" in
         before=$NOW
         # Complete this short transaction before processing a cancellation signal.
         trap '' 1 2 15
-        printf '%s %s\n' "$before" "$seconds" > "$TOKEN.arming.new" && mv "$TOKEN.arming.new" "$TOKEN.arming" || fail 'saving arm transaction'
+        printf '%s %s %s\n' "$before" "$seconds" "$DEADLINE" > "$TOKEN.arming.new" && mv "$TOKEN.arming.new" "$TOKEN.arming" || fail 'saving arm transaction'
+        rm -f "$TOKEN.owned"
         printf '%s\n' "$seconds" > "$RTC" || fail 'relative wake request'
         # Same bit as the RTC driver's RTC_AIE_ON ioctl.
         write_field 21 0 0x100000
@@ -103,12 +104,13 @@ case "$MODE" in
             number "$owned" 2147480000 || fail 'ownership value'
             [ "$DEADLINE" = "$owned" ] || fail 'alarm ownership changed'
         else
-            read -r arm_before arm_seconds < "$TOKEN.arming" || fail 'arm transaction read'
-            number "$arm_before" 2147480000 && number "$arm_seconds" 3600 || fail 'arm transaction format'
-            saved_deadline=$((S23*86400+(S21 & 0x1ffff)))
-            if [ "$DEADLINE" != "$saved_deadline" ]; then
+            read -r arm_before arm_seconds prior_deadline < "$TOKEN.arming" || fail 'arm transaction read'
+            number "$arm_before" 2147480000 && number "$arm_seconds" 3600 && \
+                number "$prior_deadline" 2147480000 || fail 'arm transaction format'
+            if [ "$DEADLINE" != "$prior_deadline" ]; then
                 [ "$(cat "$RTC")" = "$arm_seconds" ] && [ "$NOW" -ge "$arm_before" ] && \
-                    [ "$NOW" -le "$((arm_before+3))" ] || fail 'incomplete arm transaction ownership'
+                    { [ "$NOW" -le "$((arm_before+3))" ] || \
+                      { [ "$DEADLINE" -ge "$((arm_before+arm_seconds))" ] && [ "$DEADLINE" -le "$((arm_before+arm_seconds+3))" ]; }; } || fail 'incomplete arm transaction ownership'
             fi
         fi
         trap '' 1 2 15

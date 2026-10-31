@@ -71,6 +71,10 @@ Mac 已核对线上两张 PNG 的尺寸、灰度格式及 SHA-256；Kindle 也�
 
 云端图片与 Kindle 实际下载已验证。一次性预览的中文显示、方向、Home 返回和原有书籍翻页均已由用户确认正常。`kindle/rtc-test/` 提供单次 30 秒唤醒测试，前置检查及不休眠恢复自检通过，真实 RTC 测试已由内核日志验证实际休眠 30 秒并自动恢复，用户确认随后原有书籍和翻页正常；长周期和连续刷新仍待验证。`kindle/preview/` 提供 KUAL 一次性预览入口，安装后选择 **Weather preview**，用于核对屏幕方向和中文显示，具体步骤见该目录 README。设备的定时休眠、唤醒、物理退出和完整恢复阅读仍需逐项实测。尚未设置 Dashboard 开机自动运行。独立 CA 和下载工具放在用户目录，保留系统组件。实际续航不能由接口存在或电量百分比推算。
 
+## 启动天气模式
+
+KUAL 中的 **Weather** 子菜单提供持续运行、一次完整 30 分钟试运行和 Stop / Read。源码与构建说明见 [Kindle 运行器](kindle/dashboard/README.md)。短周期下载/显示/休眠/再下载、真人 Home 退出，以及原定 120 秒的休眠在 7 秒提前唤醒后恢复原闹钟均已实测通过；完整 30 分钟周期和长期续航仍待验证。没有设置开机自动运行。
+
 ## 数据和字体
 
 天气数据来自 [Open-Meteo](https://open-meteo.com/)，按 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 使用并在图片、预览页中署名。本项目为个人家庭信息屏，按其 [免费非商业 API 条款](https://open-meteo.com/en/terms) 使用。
