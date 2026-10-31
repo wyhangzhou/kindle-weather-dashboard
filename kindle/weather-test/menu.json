@@ -1,0 +1,6 @@
+{
+  "items": [
+    {"name": "Weather test (2 refreshes)", "action": "./start.sh", "exitmenu": false},
+    {"name": "Stop weather test", "action": "./stop.sh", "exitmenu": true}
+  ]
+}
