@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "name": "Wake test (30 seconds)",
+      "action": "./start.sh",
+      "exitmenu": false
+    },
+    {
+      "name": "Cancel wake test",
+      "action": "./stop.sh",
+      "exitmenu": true
+    }
+  ]
+}
