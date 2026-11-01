@@ -3,6 +3,7 @@
 set -u
 export PATH=/usr/sbin:/sbin:/usr/bin:/bin
 umask 077
+trap '' 1
 DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
 LIB=$DIR/lib
 ROOT=/mnt/us/kindle-weather
@@ -29,6 +30,7 @@ load_state() {
 }
 restore() {
     final_rc=0
+    FRAMEWORK_CHANGED=0
     if [ -r "$TOKEN" ]; then
         if "$LIB/alarm.sh" --restore "$TOKEN" >> "$LOG" 2>&1; then
             rm -f "$TOKEN"
@@ -41,8 +43,8 @@ restore() {
     now_boot=$(cat /proc/sys/kernel/random/boot_id)
     if [ "$now_boot" = "$BOOT" ]; then
         if [ "$(get_prop com.lab126.cmd wirelessEnable)" != "$W" ]; then set_prop com.lab126.cmd wirelessEnable "$W" || final_rc=1; fi
-        set_prop com.lab126.wifid enable "$F" || final_rc=1
-        set_prop com.lab126.powerd preventScreenSaver "$P" || final_rc=1
+        if [ "$(get_prop com.lab126.wifid enable)" != "$F" ]; then set_prop com.lab126.wifid enable "$F" || final_rc=1; fi
+        if [ "$(get_prop com.lab126.powerd preventScreenSaver)" != "$P" ]; then set_prop com.lab126.powerd preventScreenSaver "$P" || final_rc=1; fi
     else
         log 'RECOVER new boot; preserve fresh native power and wireless settings'
     fi
@@ -58,9 +60,13 @@ restore() {
     s=$(get_prop com.lab126.powerd state)
     log "RESTORE prevent=$p wireless=$w wifi=$f cvm=$c state=$s"
     if [ "$now_boot" = "$BOOT" ]; then
-        [ "$p" = "$P" ] && [ "$w" = "$W" ] && [ "$f" = "$F" ] && [ "$c" = "$C" ] || final_rc=1
+        [ "$p" = "$P" ] && [ "$w" = "$W" ] && [ "$f" = "$F" ] || final_rc=1
+        if [ "$c" != "$C" ]; then
+            FRAMEWORK_CHANGED=1
+            log "FRAMEWORK_PID_CHANGED expected=$C actual=$c"
+        fi
     fi
-    [ "$s" = active ] || final_rc=1
+    [ "$s" = active ] && [ -n "$c" ] || final_rc=1
     "$LIB/alarm.sh" --status >> "$LOG" 2>&1 || final_rc=1
     if [ "$final_rc" = 0 ]; then rm -f "$STATE"; fi
     return "$final_rc"
@@ -111,6 +117,8 @@ cleanup() {
     if [ -n "$JOB" ]; then kill "$JOB" 2>/dev/null || true; wait "$JOB" 2>/dev/null || true; fi
     if [ -n "$WATCH" ]; then kill "$WATCH" 2>/dev/null || true; wait "$WATCH" 2>/dev/null || true; fi
     restore || rc=1
+    # Keep verification failure distinct from successful power/alarm recovery.
+    [ "$FRAMEWORK_CHANGED" = 0 ] || rc=1
     if [ -r "$LOCK/stop-reason" ]; then log "STOP reason=$(cat "$LOCK/stop-reason")"; fi
     log "END result=$RESULT rc=$rc"
     rm -f "$LOCK/pid" "$LOCK/key-stop" "$LOCK/key-ready" "$LOCK/key-event" "$LOCK/stop-reason" "$LOCK/fetched-path"
@@ -119,7 +127,7 @@ cleanup() {
     exit "$rc"
 }
 trap cleanup 0
-trap 'RESULT=cancelled; exit 0' 1 2 15
+trap 'RESULT=cancelled; exit 0' 2 15
 log "START mode=$MODE interval=1800 prevent=$P wireless=$W wifi=$F cvm=$C"
 "$LIB/alarm.sh" --save "$TOKEN" || exit 1
 set_prop com.lab126.powerd preventScreenSaver 1 || exit 1
@@ -155,6 +163,7 @@ while :; do
     n=0
     while [ "$(get_prop com.lab126.wifid cmState)" != CONNECTED ] && [ "$n" -lt 40 ]; do sleep 1; n=$((n+1)); done
     if [ "$(get_prop com.lab126.wifid cmState)" = CONNECTED ]; then
+        log "WIFI_CONNECTED cycle=$cycle waited=$n"
         log "FETCH cycle=$cycle start"
         "$LIB/fetch.sh" --fetch > "$LOCK/fetched-path" 2>> "$LOG" &
         JOB=$!
@@ -164,6 +173,8 @@ while :; do
         if kill -0 "$JOB" 2>/dev/null; then RESULT=download-interrupted; exit 1; fi
         JOB=''
         [ "$fetch_rc" != 0 ] || fetched=1
+    else
+        log "WIFI_TIMEOUT cycle=$cycle waited=$n state=$(get_prop com.lab126.wifid cmState) cvm=$(pidof cvm 2>/dev/null || true)"
     fi
     if [ "$fetched" = 1 ]; then
         failures=0; interval=1800

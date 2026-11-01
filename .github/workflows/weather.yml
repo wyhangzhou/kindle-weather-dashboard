@@ -3,7 +3,8 @@ name: Update weather
 on:
   workflow_dispatch:
   schedule:
-    - cron: "7,37 * * * *"
+    # Publish more often than the device reads, leaving room for delayed jobs.
+    - cron: "11,26,41,56 * * * *"
   push:
     branches: [main]
     paths:
