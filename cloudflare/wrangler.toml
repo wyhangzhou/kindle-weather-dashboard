@@ -1,0 +1,12 @@
+name = "kindle-weather-scheduler"
+main = "worker.mjs"
+compatibility_date = "2026-10-31"
+workers_dev = false
+preview_urls = false
+
+[triggers]
+# Separate from GitHub's 11/26/41/56-minute schedule. UTC, including DST days.
+crons = ["4,19,34,49 * * * *"]
+
+# GITHUB_WEATHER_TOKEN must be added as an encrypted Worker secret.
+# Do not put it in vars, this file, the repository, or on the Kindle.
