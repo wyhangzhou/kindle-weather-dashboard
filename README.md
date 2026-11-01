@@ -15,6 +15,8 @@
 
 图片为无透明通道的 `L` 模式 PNG，最多 16 个灰度。当前天气包括温度、体感、天气状况、湿度、风速和当天降雨概率；下方显示未来五天的高低温和降雨概率。时间按 `America/Los_Angeles` 显示。
 
+温度与天气图标之间加入黑白灰卡通布偶猫。猫咪作为独立透明素材，由同一渲染程序随每次天气更新合成；位置会给温度及单位留出空间，天气数据、图标和五天预报继续实时生成。
+
 ## 本地运行
 
 需要 Python 3.11 或更新版本；本项目当前在 Python 3.14 上验证。
@@ -52,7 +54,7 @@ Mac 已核对线上两张 PNG 的尺寸、灰度格式及 SHA-256；Kindle 也�
 
 如果保活失败或定时任务被停用，在 Actions 中重新启用工作流并手动执行一次，随后检查失败记录。平台的调度、仓库权限和可用性仍需实际长期验证。
 
-2026-10-31 晚上的实测发现：工作流 active 且 cron 正确，仍出现数小时无新定时运行，设备因此在首次下载就拒绝过期天气并退出，未休眠。随后手动刷新 [41278223040](https://github.com/wyhangzhou/kindle-weather-dashboard/actions/runs/41278223040) 成功，Kindle 新图下载和读回哈希一致。自动供图可靠性尚未通过。已准备 [Cloudflare 独立定时备用方案](cloudflare/README.md)，本地检查通过，尚未接入账号或部署。
+2026-10-31 晚上的实测发现：工作流 active 且 cron 正确，仍出现数小时无新定时运行，严格试运行因此在首次下载就拒绝过期天气并退出，未休眠。随后手动刷新 [41278223040](https://github.com/wyhangzhou/kindle-weather-dashboard/actions/runs/41278223040) 成功，Kindle 新图下载和读回哈希一致。用户接受更新延迟，选择继续使用 GitHub；正常运行模式已有保留旧缓存并重试的处理。已准备的 [Cloudflare 独立定时备用方案](cloudflare/README.md) 保持未启用。
 
 公开仓库可以使用 GitHub Free 的 Pages；当前工作流使用标准 Ubuntu 托管运行器，每次最长 5 分钟，Pages 构建产物保留 1 天。当前已验证一次云端天气构建及发布、一次保活执行；长期定时运行仍需观察。
 
@@ -82,5 +84,7 @@ KUAL 中的 **Weather** 子菜单提供持续运行、一次完整 30 分钟试�
 天气数据来自 [Open-Meteo](https://open-meteo.com/)，按 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 使用并在图片、预览页中署名。本项目为个人家庭信息屏，按其 [免费非商业 API 条款](https://open-meteo.com/en/terms) 使用。
 
 中文字体为 Google Noto Sans SC，原文件和校验信息在 `assets/fonts/`，许可证为同目录 `OFL.txt`。天气图标由本项目代码绘制。
+
+布偶猫素材为 `assets/mascots/ragdoll.png`，根据用户确认的效果图，通过内置 imagegen 提取成透明 PNG。生成方法、提示词与文件 SHA-256 保存在同目录的 `SOURCES.json`；天气图最终仍为无透明通道的 16 级灰度。
 
 参考：[天气 API 参数](https://open-meteo.com/en/docs)、[Pages 工作流](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)、[定时工作流规则](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)。

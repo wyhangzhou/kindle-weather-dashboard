@@ -192,6 +192,16 @@ def probability(value):
     return "—" if value is None else f"{round(value)}%"
 
 
+@lru_cache(maxsize=1)
+def ragdoll():
+    with Image.open(BASE / "assets/mascots/ragdoll.png") as source:
+        picture = source.convert("RGBA")
+    bounds = picture.getchannel("A").getbbox()
+    if bounds is None:
+        raise WeatherError("Ragdoll mascot has no visible pixels")
+    return picture.crop(bounds)
+
+
 def render(weather, config):
     canvas = Image.new("L", (1600, 1200), 255)
     draw = ImageDraw.Draw(canvas)
@@ -216,6 +226,14 @@ def render(weather, config):
     width = draw.textlength(temperature, font=font(145, 650)) / 2
     unit = "°C" if config.temperature_unit == "celsius" else "°F"
     text(34+width, 154, unit, 49, 500)
+    # Keep the mascot inside the whitespace even for wide negative/Fahrenheit values.
+    unit_right = 34 + width + draw.textlength(unit, font=font(49, 500)) / 2
+    mascot_left, mascot_right = max(280, math.ceil(unit_right + 20)), 500
+    if mascot_left < mascot_right:
+        mascot = ragdoll().copy()
+        mascot.thumbnail((round(min(185, mascot_right-mascot_left)*2), 350), Image.Resampling.LANCZOS)
+        position = (round(mascot_left+mascot_right) - mascot.width//2, 590-mascot.height)
+        canvas.paste(mascot.convert("L"), position, mascot.getchannel("A"))
     text(30, 298, f"体感 {degrees(weather.apparent, config)}{unit}", 26)
     canvas.paste(icon(weather.code, weather.is_day, 310), (1040, 222))
     description = weather_text(weather.code)

@@ -1,0 +1,7 @@
+{
+  "asset": "ragdoll.png",
+  "generated_on": "2026-11-01",
+  "method": "Built-in image_gen; background extraction from the user-approved grayscale dashboard concept",
+  "prompt": "Use case: background-extraction. Asset type: reusable transparent PNG mascot for the approved Kindle weather dashboard. Input image 1 is the EDIT TARGET. Extract ONLY the single sitting fluffy cartoon Ragdoll cat in the center of this image. Preserve that cat's exact recognizable design, pose, proportions, facial markings, expression, fur line art, little paws, curled bushy tail on its right, black and gray outlines and fills, and white fur. Remove every weather-dashboard element, all lettering, numerals, lines, cloud symbols and background. Return just this one cat centered on a genuinely transparent alpha background with a small transparent margin and the entire ears, tail and paws uncropped. White fur must remain opaque white; do not make the cat's white chest or blaze transparent. Keep the approved grayscale cartoon style, no color, no shadow, no checkerboard painted into the image, no extra accessories or objects, no text. The result will be resized to approximately 175x175 pixels for an e-ink display, so retain crisp dark outlines and clean gray fills.",
+  "sha256": "13cbc1ae92d45662e0549e5a776263781672337638db81cae6b0af53a4f85ac2"
+}
