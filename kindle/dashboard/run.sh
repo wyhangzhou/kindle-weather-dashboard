@@ -15,6 +15,15 @@ MODE=${1:---check}
 get_prop() { lipc-get-prop "$1" "$2" 2>/dev/null; }
 set_prop() { lipc-set-prop -i "$1" "$2" "$3"; }
 home() { printf 'send 102\n' > /proc/keypad; }
+paint_weather() { /usr/sbin/eips -f -g "$1"; }
+prepare_display() {
+    # Native Home repaints its status bar when the radio changes state.
+    # Settle that event first, then cover it with the full image every cycle.
+    set_prop com.lab126.wifid enable 0 || return 1
+    sleep 2
+    [ "$(get_prop com.lab126.wifid enable)" = 0 ] || return 1
+    paint_weather "$1"
+}
 log() {
     if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 131072 ]; then mv -f "$LOG" "$LOG.previous"; fi
     printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "$LOG"
@@ -150,7 +159,7 @@ fi
 n=0
 while [ "$(get_prop com.lab126.powerd isCharging)" = 1 ] && [ "$n" -lt 15 ]; do sleep 1; n=$((n+1)); done
 [ "$(get_prop com.lab126.powerd isCharging)" = 0 ] || { RESULT=usb-still-connected; exit 0; }
-cycle=0; failures=0; shown=''
+cycle=0; failures=0
 while :; do
     [ ! -r "$LOCK/stop-reason" ] || { RESULT=cancelled; exit 0; }
     kill -0 "$WATCH" 2>/dev/null || { RESULT=key-listener-failed; exit 1; }
@@ -187,18 +196,10 @@ while :; do
     image=$("$LIB/fetch.sh" --current) || { RESULT=no-valid-cache; exit 1; }
     [ ! -r "$LOCK/stop-reason" ] || { RESULT=cancelled; exit 0; }
     kill -0 "$WATCH" 2>/dev/null || { RESULT=key-listener-failed; exit 1; }
-    if [ "$image" != "$shown" ]; then
-        /usr/sbin/eips -f -g "$image" || { RESULT=display-failed; exit 1; }
-        shown=$image
-        log "DISPLAY cycle=$cycle cached=$((1-fetched))"
-    else
-        log "DISPLAY cycle=$cycle unchanged=1"
-    fi
+    prepare_display "$image" || { RESULT=display-failed; exit 1; }
+    log "DISPLAY cycle=$cycle cached=$((1-fetched)) redrawn=1 wifi=0"
     if [ "$MODE" = --trial ] && [ "$fetched" = 0 ]; then RESULT=trial-download-failed; exit 1; fi
     if [ "$MODE" = --trial ] && [ "$cycle" -ge 2 ]; then RESULT=trial-complete; sleep 3; exit 0; fi
-    set_prop com.lab126.wifid enable 0 || exit 1
-    sleep 2
-    [ "$(get_prop com.lab126.wifid enable)" = 0 ] || exit 1
     kill -0 "$WATCH" 2>/dev/null || { RESULT=key-listener-failed; exit 1; }
     [ ! -r "$LOCK/stop-reason" ] || { RESULT=cancelled; exit 0; }
     sync

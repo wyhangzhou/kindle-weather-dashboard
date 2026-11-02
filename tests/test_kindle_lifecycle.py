@@ -9,6 +9,34 @@ BASE = Path(__file__).resolve().parents[1]
 
 
 class KindleLifecycleTests(unittest.TestCase):
+    def test_same_image_covers_native_status_bar_after_each_radio_change(self):
+        source = (BASE / "kindle/dashboard/run.sh").read_text()
+        definitions = source.split('if [ "$MODE" = --check ]', 1)[0]
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "display-probe.sh"
+            script.write_text(definitions + r'''
+WIFI=1
+FRAME=status-bar
+set_prop() { WIFI=$3; FRAME=status-bar; printf 'wifi=%s\n' "$WIFI"; }
+get_prop() { printf '%s\n' "$WIFI"; }
+sleep() { printf 'settle=%s\n' "$1"; }
+paint_weather() {
+    [ "$WIFI" = 0 ] || return 1
+    FRAME=weather
+    printf 'paint=%s\n' "$1"
+}
+prepare_display /same-cached-weather.png || exit 1
+[ "$FRAME" = weather ] || exit 1
+# A new wake/network cycle redraws native chrome even if the image is unchanged.
+WIFI=1; FRAME=status-bar
+prepare_display /same-cached-weather.png || exit 1
+[ "$FRAME" = weather ] || exit 1
+''')
+            result = subprocess.run(["/bin/sh", str(script)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(),
+                             ["wifi=0", "settle=2", "paint=/same-cached-weather.png"] * 2)
+
     def test_long_running_actions_close_the_kindlet(self):
         menu = json.loads((BASE / "kindle/dashboard/menu.json").read_text())
 
