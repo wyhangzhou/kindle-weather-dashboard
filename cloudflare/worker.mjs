@@ -19,7 +19,8 @@ async function readManifest(fetcher, now) {
   try {
     const response = await fetcher(`${PAGES}?check=${now}`, {
       headers: { "Cache-Control": "no-cache" },
-      redirect: "error", signal: controller.signal,
+      // Workers supports manual/follow only. A 3xx is unreadable, never followed.
+      redirect: "manual", signal: controller.signal,
     });
     return response.ok ? await response.json() : null;
   } catch {
@@ -38,7 +39,8 @@ export async function refreshIfNeeded(env, fetcher = fetch, now = Math.floor(Dat
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
     const response = await fetcher(DISPATCH, {
-      method: "POST", redirect: "error", signal: controller.signal,
+      // Do not forward the credential to a redirect target.
+      method: "POST", redirect: "manual", signal: controller.signal,
       headers: {
         "Accept": "application/vnd.github+json",
         "Content-Type": "application/json",

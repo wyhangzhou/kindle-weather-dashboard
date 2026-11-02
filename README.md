@@ -54,7 +54,7 @@ Mac 已核对线上两张 PNG 的尺寸、灰度格式及 SHA-256；Kindle 也�
 
 如果保活失败或定时任务被停用，在 Actions 中重新启用工作流并手动执行一次，随后检查失败记录。平台的调度、仓库权限和可用性仍需实际长期验证。
 
-2026-10-31 晚上的实测发现：工作流 active 且 cron 正确，仍出现数小时无新定时运行，严格试运行因此在首次下载就拒绝过期天气并退出，未休眠。随后手动刷新 [41278223040](https://github.com/wyhangzhou/kindle-weather-dashboard/actions/runs/41278223040) 成功，Kindle 新图下载和读回哈希一致。用户接受更新延迟，选择继续使用 GitHub；正常运行模式已有保留旧缓存并重试的处理。已准备的 [Cloudflare 独立定时备用方案](cloudflare/README.md) 保持未启用。
+2026-10-31 晚上的实测发现：工作流 active 且 cron 正确，仍出现数小时无新定时运行，严格试运行因此在首次下载就拒绝过期天气并退出，未休眠。随后手动刷新 [41278223040](https://github.com/wyhangzhou/kindle-weather-dashboard/actions/runs/41278223040) 成功，Kindle 新图下载和读回哈希一致。正常运行模式已有保留旧缓存并重试的处理。2026-11-02 再次观察到约 8 小时的自动触发空档后，用户选择接入 [Cloudflare 独立备用定时器](cloudflare/README.md)：每 15 分钟检查图片，陈旧时触发原有 GitHub 工作流；图片仍由 GitHub 生成并托管，Kindle 无需更改下载地址。部署状态和实际测试结果见 [验证记录](docs/validation.md)。
 
 公开仓库可以使用 GitHub Free 的 Pages；当前工作流使用标准 Ubuntu 托管运行器，每次最长 5 分钟，Pages 构建产物保留 1 天。当前已验证一次云端天气构建及发布、一次保活执行；长期定时运行仍需观察。
 

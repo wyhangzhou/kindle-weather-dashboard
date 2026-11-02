@@ -33,7 +33,7 @@ test("stale data dispatches only the fixed weather workflow on main", async () =
   const { url, options } = requests[1];
   assert.equal(url, "https://api.github.com/repos/wyhangzhou/kindle-weather-dashboard/actions/workflows/weather.yml/dispatches");
   assert.equal(options.method, "POST");
-  assert.equal(options.redirect, "error");
+  assert.equal(options.redirect, "manual");
   assert.equal(options.headers.Authorization, `Bearer ${TOKEN}`);
   assert.deepEqual(JSON.parse(options.body), { ref: "main" });
 });
@@ -61,6 +61,21 @@ test("Pages failure still attempts the publisher", async () => {
   };
   assert.equal((await refreshIfNeeded({ GITHUB_WEATHER_TOKEN: TOKEN }, fetcher, NOW)).result, "dispatch-accepted");
   assert.equal(calls, 2);
+});
+
+test("Workers-compatible redirect mode never follows Pages or credentialed GitHub redirects", async () => {
+  const requests = [];
+  const fetcher = async (url, options) => {
+    // Workers throws for `error`; `follow` could forward Authorization to Location.
+    assert.equal(options.redirect, "manual");
+    requests.push({ url, options });
+    return new Response(null, { status: 302, headers: { Location: "https://untrusted.invalid/" } });
+  };
+  await assert.rejects(refreshIfNeeded({ GITHUB_WEATHER_TOKEN: TOKEN }, fetcher, NOW), /HTTP 302/);
+  assert.equal(requests.length, 2);
+  assert.ok(requests[0].url.startsWith("https://wyhangzhou.github.io/"));
+  assert.equal(requests[0].options.headers.Authorization, undefined);
+  assert.equal(requests[1].url, "https://api.github.com/repos/wyhangzhou/kindle-weather-dashboard/actions/workflows/weather.yml/dispatches");
 });
 
 test("missing credentials and rejected dispatches fail instead of claiming a publish", async () => {

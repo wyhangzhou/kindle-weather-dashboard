@@ -5,3 +5,5 @@ public/
 build/
 .DS_Store
 *.tmp
+.wrangler/
+.dev.vars*
