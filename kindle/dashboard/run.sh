@@ -15,7 +15,19 @@ MODE=${1:---check}
 get_prop() { lipc-get-prop "$1" "$2" 2>/dev/null; }
 set_prop() { lipc-set-prop -i "$1" "$2" "$3"; }
 home() { printf 'send 102\n' > /proc/keypad; }
-paint_weather() { /usr/sbin/eips -f -g "$1"; }
+run_eips() { /usr/sbin/eips "$@"; }
+display_sync() {
+    # K4 einkfb HAL: PROC_EINK_WAITFORVSYNC (21) blocks for the last update.
+    # Filesystem sync and framebuffer readback do not wait for the e-ink panel.
+    printf '21\n' > /proc/eink_fb/update_display
+}
+paint_weather() {
+    display_sync || return 1
+    run_eips -f -c || return 1
+    display_sync || return 1
+    run_eips -f -g "$1" || return 1
+    display_sync
+}
 prepare_display() {
     # Native Home repaints its status bar when the radio changes state.
     # Settle that event first, then cover it with the full image every cycle.
@@ -85,6 +97,7 @@ check() {
     [ ! -e "$STATE" ] && [ ! -e "$TOKEN" ] || { printf 'Saved weather state needs Stop / Read recovery.\n' >&2; return 1; }
     for script in alarm.sh fetch.sh validate.sh keywatch.sh; do [ -x "$LIB/$script" ] || return 1; done
     [ -s "$DIR/prepare.png" ] && [ -w /sys/power/state ] && [ -w /proc/keypad ] || return 1
+    [ -w /proc/eink_fb/update_display ] || return 1
     [ -x /usr/sbin/eips ] && [ -x /usr/bin/waitforkey ] || return 1
     [ -x "$ROOT/runtime/xh" ] && [ -s "$ROOT/tls/cacert.pem" ] || return 1
     [ "$(get_prop com.lab126.powerd state)" = active ] && [ -n "$(pidof cvm)" ] || return 1
@@ -155,7 +168,7 @@ if [ "$MODE" = --self-check ]; then
     RESULT=home-listener-failed
     exit 1
 fi
-/usr/sbin/eips -f -g "$DIR/prepare.png" || exit 1
+paint_weather "$DIR/prepare.png" || exit 1
 n=0
 while [ "$(get_prop com.lab126.powerd isCharging)" = 1 ] && [ "$n" -lt 15 ]; do sleep 1; n=$((n+1)); done
 [ "$(get_prop com.lab126.powerd isCharging)" = 0 ] || { RESULT=usb-still-connected; exit 0; }
@@ -204,6 +217,7 @@ while :; do
     [ ! -r "$LOCK/stop-reason" ] || { RESULT=cancelled; exit 0; }
     sync
     "$LIB/alarm.sh" --arm "$interval" "$TOKEN" >> "$LOG" 2>&1 || { RESULT=alarm-arm-failed; exit 1; }
+    display_sync || { RESULT=display-sync-failed; exit 1; }
     log "SUSPEND cycle=$cycle seconds=$interval wifi=0"
     before=$(date -u +%s)
     printf 'mem\n' > /sys/power/state

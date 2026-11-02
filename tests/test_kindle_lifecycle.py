@@ -9,6 +9,42 @@ BASE = Path(__file__).resolve().parents[1]
 
 
 class KindleLifecycleTests(unittest.TestCase):
+    def test_paint_waits_for_clear_and_image_to_finish_on_the_panel(self):
+        source = (BASE / "kindle/dashboard/run.sh").read_text()
+        definitions = source.split('if [ "$MODE" = --check ]', 1)[0]
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "panel-probe.sh"
+            script.write_text(definitions + r'''
+PENDING=old-frame
+display_sync() { printf 'wait\n'; PENDING=''; }
+run_eips() {
+    [ -z "$PENDING" ] || exit 9
+    printf 'draw %s\n' "$*"
+    PENDING=$*
+}
+paint_weather /weather.png || exit 1
+[ -z "$PENDING" ] || exit 2
+''')
+            result = subprocess.run(["/bin/sh", str(script)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(),
+                             ["wait", "draw -f -c", "wait", "draw -f -g /weather.png", "wait"])
+
+    def test_failed_panel_wait_stops_the_next_display_command(self):
+        source = (BASE / "kindle/dashboard/run.sh").read_text()
+        definitions = source.split('if [ "$MODE" = --check ]', 1)[0]
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "panel-failure.sh"
+            script.write_text(definitions + r'''
+N=0
+display_sync() { N=$((N+1)); printf 'wait=%s\n' "$N"; [ "$N" != 2 ]; }
+run_eips() { printf 'draw %s\n' "$*"; }
+if paint_weather /weather.png; then exit 1; fi
+''')
+            result = subprocess.run(["/bin/sh", str(script)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(), ["wait=1", "draw -f -c", "wait=2"])
+
     def test_same_image_covers_native_status_bar_after_each_radio_change(self):
         source = (BASE / "kindle/dashboard/run.sh").read_text()
         definitions = source.split('if [ "$MODE" = --check ]', 1)[0]
