@@ -107,9 +107,10 @@ def fetch_weather(config):
     request = Request("https://api.open-meteo.com/v1/forecast?" + urlencode(params),
                       headers={"User-Agent": "KindleWeather/1.0 (personal weather display)"})
     last_error = None
-    for attempt in range(3):
+    attempts = 4
+    for attempt in range(attempts):
         try:
-            with urlopen(request, timeout=12) as response:
+            with urlopen(request, timeout=20) as response:
                 data = response.read(262145)
             if len(data) > 262144:
                 raise WeatherError("Weather response exceeds expected size")
@@ -120,9 +121,9 @@ def fetch_weather(config):
             last_error = exc
         except (URLError, TimeoutError, json.JSONDecodeError) as exc:
             last_error = exc
-        if attempt < 2:
+        if attempt < attempts - 1:
             time.sleep(2 ** (attempt + 1))
-    raise WeatherError(f"Weather API unavailable after three attempts: {last_error}")
+    raise WeatherError(f"Weather API unavailable after {attempts} attempts: {last_error}")
 
 
 def normalize(payload, config, now=None):
