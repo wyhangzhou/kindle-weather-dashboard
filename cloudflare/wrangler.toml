@@ -10,8 +10,8 @@ head_sampling_rate = 1
 invocation_logs = true
 
 [triggers]
-# Primary update clock. UTC, including DST days.
-crons = ["4,19,34,49 * * * *"]
+# Stopped at the owner's request on 2026-11-20.
+crons = []
 
 # GITHUB_WEATHER_TOKEN must be added as an encrypted Worker secret.
 # Do not put it in vars, this file, the repository, or on the Kindle.

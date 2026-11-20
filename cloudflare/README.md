@@ -1,5 +1,7 @@
 # Cloudflare 天气下载与定时器
 
+**当前状态：天气自动服务已于 2026-11-20 按用户要求停用。Cloudflare 定时器已清空，GitHub 天气更新及保活工作流均已禁用。下文保留原有实施说明。**
+
 GitHub 原生定时触发在本项目的观察中出现过数小时空档。2026-10-31 晚上的设备复测因此在第一次下载即因天气过期退出，尚未休眠。手动触发同一流程后，生成、发布和 Kindle 下载恢复成功；这不能证明自动调度已经恢复可靠。
 
 此 Worker 给现有 GitHub 流程增加独立的时钟。它每 15 分钟检查 Pages：生成时间超过 20 分钟，或天气有效期不足 45 分钟，以及页面无法读取时，尝试触发 `weather.yml` 的 `workflow_dispatch`。正常更新时，Worker 先通过 Cloudflare 网络获取天气，将有大小上限的 JSON 数据作为 weather_input 传给固定 GitHub 工作流；Python 验证配置、单位、日期和有效期后生成并发布到原 Pages。GitHub 直接取数保留为失败后备。GitHub 原生天气 cron 已停用，Cloudflare 是唯一日常天气时钟。

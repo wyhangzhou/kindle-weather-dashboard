@@ -1,5 +1,7 @@
 # Kindle 中文天气屏
 
+**当前状态：天气自动服务已于 2026-11-20 按用户要求停用。Cloudflare 定时器已清空，GitHub 天气更新及保活工作流均已禁用。下文保留原有实施说明。**
+
 为 Kindle 4 生成清晰的中文灰度天气图。默认 Redmond, Washington、摄氏度、五天天气、美国太平洋时区。天气图由 GitHub Actions 更新并部署到 GitHub Pages，家中无需常开服务器。
 
 ## 生成内容
