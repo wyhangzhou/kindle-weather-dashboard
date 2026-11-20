@@ -1,8 +1,8 @@
-# Cloudflare 云端备用定时器
+# Cloudflare 天气下载与定时器
 
 GitHub 原生定时触发在本项目的观察中出现过数小时空档。2026-10-31 晚上的设备复测因此在第一次下载即因天气过期退出，尚未休眠。手动触发同一流程后，生成、发布和 Kindle 下载恢复成功；这不能证明自动调度已经恢复可靠。
 
-此 Worker 给现有 GitHub 流程增加独立的时钟。它每 15 分钟检查 Pages：生成时间超过 20 分钟，或天气有效期不足 45 分钟，以及页面无法读取时，尝试触发 `weather.yml` 的 `workflow_dispatch`。图片仍由原来的 Python 生成并发布到原 Pages；Kindle 配置不需要更改。GitHub 原生定时可保留。
+此 Worker 给现有 GitHub 流程增加独立的时钟。它每 15 分钟检查 Pages：生成时间超过 20 分钟，或天气有效期不足 45 分钟，以及页面无法读取时，尝试触发 `weather.yml` 的 `workflow_dispatch`。正常更新时，Worker 先通过 Cloudflare 网络获取天气，将有大小上限的 JSON 数据作为 weather_input 传给固定 GitHub 工作流；Python 验证配置、单位、日期和有效期后生成并发布到原 Pages。GitHub 直接取数保留为失败后备。GitHub 原生天气 cron 已停用，Cloudflare 是唯一日常天气时钟。
 
 2026-11-02 已按用户选择部署到自己的 Cloudflare 账号，并配置正式环境加密 Secret 和 Cron。自动事件的实际验证结果见 [验证记录](../docs/validation.md)。它降低对单个定时器的依赖，GitHub 运行器、Pages 或天气 API 故障仍可能影响更新。
 
@@ -53,3 +53,5 @@ GitHub HTTP 401 通常表示令牌失效；403 还需检查仓库范围、Action
 - [Workers 免费额度与 CPU 限制](https://developers.cloudflare.com/workers/platform/pricing/)
 - [加密 Secret](https://developers.cloudflare.com/workers/configuration/secrets/)
 - [Workers Request 的重定向模式](https://developers.cloudflare.com/workers/runtime-apis/request/)
+
+2026-11-20：近期 200 次运行中有 10 次天气 TLS 超时和 5 次 HTTP 429，增加重试不足以解决。现将正常取数移至 Cloudflare，采用供应商对 Cloudflare 用户的限流方式（见 [Open-Meteo 条款](https://open-meteo.com/en/terms)）。未新增公开 HTTP 入口或凭据。修改天气配置须同步 weather-source.mjs；GitHub 不会执行工作流输入中的代码，JSON 仅作为数据解析。

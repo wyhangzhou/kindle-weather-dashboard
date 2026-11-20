@@ -1,4 +1,5 @@
-// Independent clock for the existing GitHub publisher. No public trigger.
+// Fetch weather on Cloudflare, then dispatch the GitHub renderer. No public trigger.
+import { fetchWeatherInput } from "./weather-source.mjs";
 const PAGES = "https://wyhangzhou.github.io/kindle-weather-dashboard/manifest.json";
 const DISPATCH = "https://api.github.com/repos/wyhangzhou/kindle-weather-dashboard/actions/workflows/weather.yml/dispatches";
 
@@ -35,6 +36,9 @@ export async function refreshIfNeeded(env, fetcher = fetch, now = Math.floor(Dat
   if (typeof env.GITHUB_WEATHER_TOKEN !== "string" || !env.GITHUB_WEATHER_TOKEN.trim()) {
     throw new Error("Missing GITHUB_WEATHER_TOKEN secret");
   }
+  let weatherInput;
+  try { weatherInput = await fetchWeatherInput(fetcher); }
+  catch (error) { console.log(`Cloudflare weather fetch unavailable (${error.message}); using GitHub direct fallback`); }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
@@ -48,14 +52,14 @@ export async function refreshIfNeeded(env, fetcher = fetch, now = Math.floor(Dat
         "X-GitHub-Api-Version": "2026-03-10",
         "Authorization": `Bearer ${env.GITHUB_WEATHER_TOKEN}`,
       },
-      body: JSON.stringify({ ref: "main" }),
+      body: JSON.stringify({ ref: "main", ...(weatherInput ? { inputs: { weather_input: weatherInput } } : {}) }),
     });
     // API versions can return either run details (200) or no content (204).
     const status = response.status;
     if (response.body) await response.body.cancel();
     if (status !== 200 && status !== 204) throw new Error(`GitHub dispatch rejected (HTTP ${status})`);
     // Accepted is not the same as successful generation or deployment.
-    return { result: "dispatch-accepted", status };
+    return { result: "dispatch-accepted", status, weather_source: weatherInput ? "cloudflare" : "github-fallback" };
   } finally {
     clearTimeout(timeout);
   }

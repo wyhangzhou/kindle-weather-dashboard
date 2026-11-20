@@ -10,7 +10,7 @@ head_sampling_rate = 1
 invocation_logs = true
 
 [triggers]
-# Separate from GitHub's 11/26/41/56-minute schedule. UTC, including DST days.
+# Primary update clock. UTC, including DST days.
 crons = ["4,19,34,49 * * * *"]
 
 # GITHUB_WEATHER_TOKEN must be added as an encrypted Worker secret.

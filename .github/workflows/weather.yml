@@ -2,9 +2,12 @@ name: Update weather
 
 on:
   workflow_dispatch:
-  schedule:
-    # Publish more often than the device reads, leaving room for delayed jobs.
-    - cron: "11,26,41,56 * * * *"
+    inputs:
+      weather_input:
+        description: Validated by the renderer; optional weather data from Cloudflare
+        required: false
+        default: ""
+        type: string
   push:
     branches: [main]
     paths:
@@ -50,6 +53,8 @@ jobs:
       - name: Verify backup scheduler
         run: node --test cloudflare/test-worker.mjs
       - name: Generate current weather images
+        env:
+          CLOUDFLARE_WEATHER_INPUT: ${{ inputs.weather_input }}
         run: python generate.py --config config.toml --output public
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0

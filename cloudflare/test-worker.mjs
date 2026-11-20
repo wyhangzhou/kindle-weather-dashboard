@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import worker, { refreshIfNeeded } from "./worker.mjs";
+import { fetchWeatherInput, weatherConfig } from "./weather-source.mjs";
 
 const NOW = 1793512800;
 const TOKEN = "test-value-never-a-real-token";
@@ -14,6 +15,7 @@ function transport(manifest, status = 204) {
   const fetcher = async (url, options) => {
     requests.push({ url, options });
     if (requests.length === 1) return new Response(JSON.stringify(manifest));
+    if (url.startsWith("https://api.open-meteo.com/")) throw new Error("Simulated unavailable source");
     return new Response(status === 204 ? null : "{}", { status });
   };
   return { requests, fetcher };
@@ -30,7 +32,7 @@ test("stale data dispatches only the fixed weather workflow on main", async () =
   const stale = fresh(); stale.generated_epoch -= 7200; stale.weather_epoch -= 7200; stale.expires_epoch -= 7200;
   const { fetcher, requests } = transport(stale);
   assert.equal((await refreshIfNeeded({ GITHUB_WEATHER_TOKEN: TOKEN }, fetcher, NOW)).result, "dispatch-accepted");
-  const { url, options } = requests[1];
+  const { url, options } = requests[2];
   assert.equal(url, "https://api.github.com/repos/wyhangzhou/kindle-weather-dashboard/actions/workflows/weather.yml/dispatches");
   assert.equal(options.method, "POST");
   assert.equal(options.redirect, "manual");
@@ -49,7 +51,7 @@ test("recent generation cannot hide old weather or a fabricated future timestamp
   for (const manifest of variants) {
     const { fetcher, requests } = transport(manifest);
     await refreshIfNeeded({ GITHUB_WEATHER_TOKEN: TOKEN }, fetcher, NOW);
-    assert.equal(requests.length, 2);
+    assert.equal(requests.length, 3);
   }
 });
 
@@ -60,7 +62,7 @@ test("Pages failure still attempts the publisher", async () => {
     return new Response(null, { status: 204 });
   };
   assert.equal((await refreshIfNeeded({ GITHUB_WEATHER_TOKEN: TOKEN }, fetcher, NOW)).result, "dispatch-accepted");
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
 });
 
 test("Workers-compatible redirect mode never follows Pages or credentialed GitHub redirects", async () => {
@@ -72,10 +74,10 @@ test("Workers-compatible redirect mode never follows Pages or credentialed GitHu
     return new Response(null, { status: 302, headers: { Location: "https://untrusted.invalid/" } });
   };
   await assert.rejects(refreshIfNeeded({ GITHUB_WEATHER_TOKEN: TOKEN }, fetcher, NOW), /HTTP 302/);
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 3);
   assert.ok(requests[0].url.startsWith("https://wyhangzhou.github.io/"));
   assert.equal(requests[0].options.headers.Authorization, undefined);
-  assert.equal(requests[1].url, "https://api.github.com/repos/wyhangzhou/kindle-weather-dashboard/actions/workflows/weather.yml/dispatches");
+  assert.equal(requests[2].url, "https://api.github.com/repos/wyhangzhou/kindle-weather-dashboard/actions/workflows/weather.yml/dispatches");
 });
 
 test("missing credentials and rejected dispatches fail instead of claiming a publish", async () => {
@@ -88,4 +90,30 @@ test("missing credentials and rejected dispatches fail instead of claiming a pub
 test("HTTP visitors cannot trigger a build", async () => {
   const response = await worker.fetch(new Request("https://example.invalid/refresh"));
   assert.equal(response.status, 404);
+});
+
+test("Cloudflare supplies bounded weather input to GitHub without exposing its secret to weather", async () => {
+  const requests = [];
+  const fetcher = async (url, options) => {
+    requests.push({ url, options });
+    if (url.startsWith("https://wyhangzhou.github.io/")) return new Response("null");
+    if (url.startsWith("https://api.open-meteo.com/")) return Response.json({ current: { time: NOW } });
+    return new Response(null, { status: 204 });
+  };
+  const result = await refreshIfNeeded({ GITHUB_WEATHER_TOKEN: TOKEN }, fetcher, NOW);
+  assert.equal(result.result, "dispatch-accepted");
+  assert.equal(requests[1].options.headers.Authorization, undefined);
+  assert.equal(requests[1].options.redirect, "manual");
+  const envelope = JSON.parse(JSON.parse(requests[2].options.body).inputs.weather_input);
+  assert.deepEqual(envelope.config, weatherConfig);
+  assert.equal(envelope.schema, "kindle-weather-source-v1");
+  assert.equal(envelope.payload.current.time, NOW);
+});
+
+test("Cloudflare rejects redirects, rate limits and oversized weather responses without rapid retries", async () => {
+  for (const response of [new Response(null, { status: 302 }), new Response(null, { status: 429 }), new Response("x".repeat(30001))]) {
+    let calls = 0;
+    await assert.rejects(fetchWeatherInput(async () => { calls++; return response; }));
+    assert.equal(calls, 1);
+  }
 });

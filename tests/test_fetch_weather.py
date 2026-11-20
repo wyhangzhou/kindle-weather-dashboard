@@ -1,5 +1,6 @@
 import io
 import json
+from datetime import datetime, timezone
 import unittest
 from unittest.mock import call, patch
 from urllib.error import HTTPError, URLError
@@ -27,7 +28,7 @@ class WeatherFetchTests(unittest.TestCase):
 
     def test_temporary_network_and_server_errors_can_recover(self):
         for failure in [TimeoutError("read timeout"), URLError("temporary network failure"),
-                        HTTPError("https://api.open-meteo.com/", 429, "busy", {}, None),
+                        HTTPError("https://api.open-meteo.com/", 429, "busy", {"Retry-After": "2"}, None),
                         HTTPError("https://api.open-meteo.com/", 503, "unavailable", {}, None)]:
             if isinstance(failure, HTTPError):
                 self.addCleanup(failure.close)
@@ -55,6 +56,32 @@ class WeatherFetchTests(unittest.TestCase):
                 fetch_weather(self.config)
         self.assertEqual(request.call_count, 4)
         self.assertEqual(sleep.call_args_list, [call(2), call(4), call(8)])
+
+    def test_rate_limit_waits_at_least_retry_after(self):
+        error = HTTPError("https://api.open-meteo.com/", 429, "busy", {"Retry-After": "30"}, None)
+        self.addCleanup(error.close)
+        with patch("generate.urlopen", side_effect=[error, self.response()]), patch("generate.time.sleep") as sleep:
+            self.assertEqual(fetch_weather(self.config), self.payload)
+        sleep.assert_called_once_with(30)
+
+    def test_long_rate_limit_defers_to_next_scheduled_run(self):
+        error = HTTPError("https://api.open-meteo.com/", 429, "busy", {"Retry-After": "900"}, None)
+        self.addCleanup(error.close)
+        with patch("generate.urlopen", side_effect=error) as request, patch("generate.time.sleep") as sleep:
+            with self.assertRaisesRegex(WeatherError, "next scheduled update"):
+                fetch_weather(self.config)
+        self.assertEqual(request.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_http_date_retry_after_is_respected(self):
+        error = HTTPError("https://api.open-meteo.com/", 429, "busy",
+                          {"Retry-After": "Fri, 20 Nov 2026 22:00:30 GMT"}, None)
+        self.addCleanup(error.close)
+        with patch("generate.datetime") as clock, patch("generate.urlopen", side_effect=[error, self.response()]), \
+                patch("generate.time.sleep") as sleep:
+            clock.now.return_value = datetime(2026, 11, 20, 22, 0, tzinfo=timezone.utc)
+            self.assertEqual(fetch_weather(self.config), self.payload)
+        sleep.assert_called_once_with(30)
 
 
 if __name__ == "__main__":

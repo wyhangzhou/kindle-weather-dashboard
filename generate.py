@@ -4,6 +4,7 @@ import argparse
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
+from email.utils import parsedate_to_datetime
 import hashlib
 import html
 import io
@@ -109,6 +110,7 @@ def fetch_weather(config):
     last_error = None
     attempts = 4
     for attempt in range(attempts):
+        delay = 2 ** (attempt + 1)
         try:
             with urlopen(request, timeout=20) as response:
                 data = response.read(262145)
@@ -118,12 +120,39 @@ def fetch_weather(config):
         except HTTPError as exc:
             if exc.code < 500 and exc.code != 429:
                 raise WeatherError(f"Weather API returned HTTP {exc.code}") from exc
+            if exc.code == 429:
+                value = (exc.headers or {}).get("Retry-After", "")
+                try:
+                    wait = int(value) if value.isdigit() else (parsedate_to_datetime(value) - datetime.now(UTC)).total_seconds()
+                except (ValueError, TypeError, OverflowError):
+                    wait = 60
+                # Do not retry earlier than requested or exhaust the five-minute job.
+                if wait > 60 or attempt == attempts - 1:
+                    raise WeatherError("Weather API rate limited; waiting for the next scheduled update") from exc
+                delay = max(delay, wait, 0)
             last_error = exc
         except (URLError, TimeoutError, json.JSONDecodeError) as exc:
             last_error = exc
         if attempt < attempts - 1:
-            time.sleep(2 ** (attempt + 1))
+            time.sleep(delay)
     raise WeatherError(f"Weather API unavailable after {attempts} attempts: {last_error}")
+
+
+def load_weather_input(config, value):
+    """Treat workflow input as data, and apply normal validation before rendering."""
+    if not value:
+        print("Weather data source: direct API")
+        return fetch_weather(config)
+    if len(value.encode("utf-8")) > 32768:
+        raise WeatherError("Cloudflare weather input exceeds expected size")
+    envelope = json.loads(value)
+    expected = {key: getattr(config, key) for key in
+                ("latitude", "longitude", "timezone", "forecast_days")}
+    if not isinstance(envelope, dict) or envelope.get("schema") != "kindle-weather-source-v1" \
+            or envelope.get("config") != expected or not isinstance(envelope.get("payload"), dict):
+        raise WeatherError("Cloudflare weather input does not match the configured location")
+    print("Weather data source: Cloudflare")
+    return envelope["payload"]
 
 
 def normalize(payload, config, now=None):
@@ -336,7 +365,7 @@ def main():
     args = parser.parse_args()
     try:
         config = Config.load(args.config)
-        result = generate_site(fetch_weather(config), config, args.output)
+        result = generate_site(load_weather_input(config, os.environ.get("CLOUDFLARE_WEATHER_INPUT", "")), config, args.output)
     except (WeatherError, OSError, ValueError) as exc:
         print(f"Weather image not published: {exc}", file=sys.stderr)
         return 1
